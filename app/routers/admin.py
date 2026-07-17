@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import admin
 from app.config import BACKUP_DIR, DATABASE_PATH
-from app.database import engine, get_db
+from app.database import SessionLocal, engine, get_db
 from app.models import AuditLog, Backup, User
 from app.utils import iso, response
 
@@ -34,7 +34,8 @@ async def audit_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1
     items = db.scalars(query.order_by(AuditLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     return response({"items": [{"id": x.id, "operator_id": x.operator_id, "action": x.action,
                                 "target_type": x.target_type, "target_id": x.target_id,
-                                "success": x.success, "detail": x.detail, "created_at": iso(x.created_at)} for x in items]})
+                                "success": x.success, "detail": x.detail, "created_at": iso(x.created_at)} for x in items],
+                     "total": total, "page": page, "page_size": page_size})
 
 
 @router.post("/admin/backups")
@@ -68,7 +69,10 @@ async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Se
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("storage") != "sqlite" or "oj.db" not in manifest.get("files", []): raise ValueError("invalid manifest")
-        check = sqlite3.connect(source); check.execute("PRAGMA quick_check").fetchone(); check.close()
+        check = sqlite3.connect(source)
+        check_result = check.execute("PRAGMA quick_check").fetchone()
+        check.close()
+        if not check_result or check_result[0] != "ok": raise ValueError("database integrity check failed")
     except Exception as exc:
         raise HTTPException(400, f"invalid backup: {exc}")
     safety = DATABASE_PATH.with_suffix(".restore-safety")
@@ -78,4 +82,7 @@ async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Se
         safety.unlink(missing_ok=True)
     except Exception:
         shutil.copy2(safety, DATABASE_PATH); safety.unlink(missing_ok=True); raise HTTPException(500, "restore failed")
+    with SessionLocal() as restored_db:
+        restored_db.add(AuditLog(operator_id=operator.id, action="RESTORE_BACKUP", target_type="backup", target_id=backup_id))
+        restored_db.commit()
     return response({"backup_id": backup_id}, "backup restored")

@@ -19,10 +19,12 @@ from app.routers import admin, auth_users, problems, submissions
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_directories(); Base.metadata.create_all(engine)
+    ensure_directories()
+    Base.metadata.create_all(engine)
     with SessionLocal() as db:
         if not db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
-            db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin")); db.commit()
+            db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin"))
+            db.commit()
         now = datetime.now(timezone.utc)
         db.execute(update(Submission).where(Submission.status.in_(["pending", "running"])).values(
             status="failed", result="SE", finished_at=now
@@ -70,3 +72,10 @@ async def internal_error(_: Request, __: Exception):
 @app.get("/", include_in_schema=False)
 async def frontend():
     return FileResponse(BASE_DIR / "frontend" / "index.html")
+
+
+@app.get("/api/health", tags=["system"])
+async def health():
+    with SessionLocal() as db:
+        db.execute(select(1)).scalar_one()
+    return {"code": 200, "message": "ok", "data": {"status": "healthy", "storage": "sqlite"}}

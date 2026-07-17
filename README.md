@@ -13,6 +13,8 @@ uvicorn app.main:app --reload
 
 访问 `http://127.0.0.1:8000/`，API 文档位于 `/docs`。
 
+健康检查接口为 `GET /api/health`，用于确认 Web 服务和 SQLite 连接正常。
+
 VS Code 用户可以直接打开项目，选择 `Run Mini OJ (Uvicorn)` 调试配置，或运行默认测试任务。
 
 初始管理员默认为 `admin / admin12345`。正式使用前通过环境变量 `OJ_ADMIN_USERNAME`、`OJ_ADMIN_PASSWORD`、`OJ_SESSION_SECRET` 修改。

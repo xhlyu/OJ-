@@ -68,7 +68,13 @@ async def update_user(user_id: str, body: UserUpdate, operator: User = Depends(a
     if user.id == operator.id and not body.is_active: raise HTTPException(400, "cannot disable yourself")
     old_role, old_active = user.role, user.is_active
     user.role, user.is_active, user.updated_at = body.role, body.is_active, datetime.now(timezone.utc)
-    action = "UPDATE_USER_ROLE" if old_role != body.role else "DISABLE_USER" if old_active and not body.is_active else "UPDATE_USER"
-    db.add(AuditLog(operator_id=operator.id, action=action, target_type="user", target_id=user.id))
+    if old_role != body.role:
+        db.add(AuditLog(operator_id=operator.id, action="UPDATE_USER_ROLE", target_type="user", target_id=user.id,
+                        detail=f"{old_role} -> {body.role}"))
+    if old_active and not body.is_active:
+        db.add(AuditLog(operator_id=operator.id, action="DISABLE_USER", target_type="user", target_id=user.id))
+    if old_role == body.role and old_active == body.is_active:
+        db.add(AuditLog(operator_id=operator.id, action="UPDATE_USER", target_type="user", target_id=user.id,
+                        detail="no changes"))
     db.commit()
     return response(user_view(user))

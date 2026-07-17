@@ -40,8 +40,21 @@ def test_admin_user_management_and_audit_log():
         assert updated.json()["data"]["role"] == "teacher"
         assert student.get("/api/auth/me").status_code == 403
         audits = admin_client.get("/api/audit-logs", params={"target_id": target["id"]}).json()["data"]
-        assert audits["total"] >= 1
-        assert audits["items"][0]["action"] == "UPDATE_USER_ROLE"
+        actions = {item["action"] for item in audits["items"]}
+        assert {"UPDATE_USER_ROLE", "DISABLE_USER"} <= actions
+
+
+def test_admin_cannot_disable_self_and_teacher_cannot_manage_users():
+    with TestClient(app) as admin_client:
+        admin_data = admin_client.post("/api/auth/login", json={"username": "admin", "password": "admin12345"}).json()["data"]
+        assert admin_client.put(f"/api/users/{admin_data['id']}", json={"role": "admin", "is_active": False}).status_code == 400
+        teacher_client = TestClient(app)
+        username = unique("teacher")
+        register_and_login(teacher_client, username)
+        users = admin_client.get("/api/users", params={"page_size": 100}).json()["data"]["items"]
+        teacher = next(item for item in users if item["username"] == username)
+        admin_client.put(f"/api/users/{teacher['id']}", json={"role": "teacher", "is_active": True})
+        assert teacher_client.get("/api/users").status_code == 403
 
 
 def test_problem_score_validation_and_duplicate_id():

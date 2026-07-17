@@ -14,7 +14,7 @@ from app.auth import admin
 from app.config import BACKUP_DIR, DATABASE_PATH
 from app.database import SessionLocal, engine, get_db
 from app.models import AuditLog, Backup, User
-from app.utils import iso, response
+from app.utils import iso, response, validate_time_range
 
 router = APIRouter()
 
@@ -31,6 +31,7 @@ async def audit_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1
                      operator_id: str | None = None, action: str | None = None, target_id: str | None = None,
                      start_time: datetime | None = None, end_time: datetime | None = None,
                      _: User = Depends(admin), db: Session = Depends(get_db)):
+    validate_time_range(start_time, end_time)
     query = select(AuditLog)
     if operator_id: query = query.where(AuditLog.operator_id == operator_id)
     if action: query = query.where(AuditLog.action == action)
@@ -38,7 +39,8 @@ async def audit_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1
     if start_time: query = query.where(AuditLog.created_at >= start_time)
     if end_time: query = query.where(AuditLog.created_at <= end_time)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
-    items = db.scalars(query.order_by(AuditLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
+    items = db.scalars(query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+                       .offset((page - 1) * page_size).limit(page_size)).all()
     return response({"items": [{"id": x.id, "operator_id": x.operator_id, "action": x.action,
                                 "target_type": x.target_type, "target_id": x.target_id,
                                 "success": x.success, "detail": x.detail, "created_at": iso(x.created_at)} for x in items],

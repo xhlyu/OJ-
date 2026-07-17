@@ -37,3 +37,10 @@ def normalize_output(value: str) -> str:
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
+
+
+def validate_time_range(start_time: datetime | None, end_time: datetime | None) -> None:
+    if start_time and end_time and start_time > end_time:
+        from fastapi import HTTPException
+
+        raise HTTPException(400, "start_time must not be after end_time")

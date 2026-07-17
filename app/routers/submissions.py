@@ -14,7 +14,7 @@ from app.models import AuditLog, JudgeLog, Problem, Submission, User
 from app.schemas import SubmissionIn
 from app.serializers import log_view, submission_view
 from app.services import evaluate_submission
-from app.utils import iso, response
+from app.utils import response, validate_time_range
 
 router = APIRouter()
 
@@ -37,6 +37,7 @@ async def list_submissions(page: int = Query(1, ge=1), page_size: int = Query(20
                            result: Literal["AC", "WA", "RE", "TLE", "SE"] | None = None,
                            start_time: datetime | None = None, end_time: datetime | None = None,
                            user: User = Depends(current_user), db: Session = Depends(get_db)):
+    validate_time_range(start_time, end_time)
     query = select(Submission)
     if user.role == "student": query = query.where(Submission.user_id == user.id)
     elif user_id: query = query.where(Submission.user_id == user_id)
@@ -90,6 +91,7 @@ async def all_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, 
                    result: Literal["AC", "WA", "RE", "TLE", "SE"] | None = None,
                    start_time: datetime | None = None, end_time: datetime | None = None,
                    _: User = Depends(teacher), db: Session = Depends(get_db)):
+    validate_time_range(start_time, end_time)
     query = select(JudgeLog).join(Submission, Submission.id == JudgeLog.submission_id)
     if submission_id: query = query.where(JudgeLog.submission_id == submission_id)
     if problem_id: query = query.where(Submission.problem_id == problem_id)
@@ -98,6 +100,7 @@ async def all_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, 
     if start_time: query = query.where(JudgeLog.created_at >= start_time)
     if end_time: query = query.where(JudgeLog.created_at <= end_time)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
-    items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
+    items = db.scalars(query.order_by(JudgeLog.created_at.desc(), JudgeLog.id.desc())
+                       .offset((page - 1) * page_size).limit(page_size)).all()
     return response({"items": [log_view(x, True) | {"submission_id": x.submission_id} for x in items],
                      "total": total, "page": page, "page_size": page_size})

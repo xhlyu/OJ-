@@ -49,7 +49,8 @@ async def me(user: User = Depends(current_user)):
 @router.get("/users")
 async def users(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                 _: User = Depends(admin), db: Session = Depends(get_db)):
-    items = db.scalars(select(User).offset((page - 1) * page_size).limit(page_size)).all()
+    items = db.scalars(select(User).order_by(User.created_at, User.id)
+                       .offset((page - 1) * page_size).limit(page_size)).all()
     total = db.scalar(select(func.count()).select_from(User))
     return response({"items": [user_view(x) for x in items], "total": total, "page": page, "page_size": page_size})
 

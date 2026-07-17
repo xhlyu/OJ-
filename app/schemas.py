@@ -9,6 +9,20 @@ class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     password: str = Field(min_length=8, max_length=128)
 
+    @field_validator("username")
+    @classmethod
+    def username_must_not_have_outer_whitespace(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("username cannot start or end with whitespace")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def password_must_fit_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("password must not exceed 72 UTF-8 bytes")
+        return value
+
 
 class UserUpdate(BaseModel):
     role: Literal["student", "teacher", "admin"]

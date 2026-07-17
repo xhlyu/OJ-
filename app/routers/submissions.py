@@ -90,7 +90,7 @@ async def all_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, 
                    user_id: str | None = None,
                    result: Literal["AC", "WA", "RE", "TLE", "SE"] | None = None,
                    start_time: datetime | None = None, end_time: datetime | None = None,
-                   _: User = Depends(teacher), db: Session = Depends(get_db)):
+                   operator: User = Depends(teacher), db: Session = Depends(get_db)):
     validate_time_range(start_time, end_time)
     query = select(JudgeLog).join(Submission, Submission.id == JudgeLog.submission_id)
     if submission_id: query = query.where(JudgeLog.submission_id == submission_id)
@@ -102,5 +102,10 @@ async def all_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, 
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     items = db.scalars(query.order_by(JudgeLog.created_at.desc(), JudgeLog.id.desc())
                        .offset((page - 1) * page_size).limit(page_size)).all()
+    for target_id in sorted({item.submission_id for item in items}):
+        db.add(AuditLog(operator_id=operator.id, action="VIEW_FULL_JUDGE_LOG", target_type="submission",
+                        target_id=target_id, detail="viewed through log search"))
+    if items:
+        db.commit()
     return response({"items": [log_view(x, True) | {"submission_id": x.submission_id} for x in items],
                      "total": total, "page": page, "page_size": page_size})

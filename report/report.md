@@ -18,7 +18,7 @@
 
 ## 5. API 说明
 
-接口以 `/api` 为前缀，完整清单可通过 FastAPI `/docs` 查看。主要接口包括：认证 `/auth/register`、`/auth/login`、`/auth/logout`、`/auth/me`；用户 `/users`、`/users/{user_id}`；题目 `/problems`、`/problems/{problem_id}`；提交 `/submissions`、`/submissions/{submission_id}`、重新评测接口；日志 `/logs`、提交日志和 `/audit-logs`；备份创建、列表与恢复接口。受保护接口均在后端执行 Session、启用状态和角色检查。
+接口以 `/api` 为前缀，完整清单可通过 FastAPI `/docs` 查看。主要接口包括：认证 `/auth/register`、`/auth/login`、`/auth/logout`、`/auth/me`；用户 `/users`、`/users/{user_id}`；题目 `/problems`、`/problems/{problem_id}`；提交 `/submissions`、`/submissions/{submission_id}`、重新评测接口；日志 `/logs`、提交日志和 `/audit-logs`；备份创建、列表与恢复接口。受保护接口均在后端执行 Session、启用状态和角色检查。教师通过单次提交日志接口或批量日志检索查看完整日志时都会产生审计记录。
 
 ## 6. 测试结果
 

@@ -36,7 +36,7 @@ def submission_view(item: Submission, include_source: bool = True) -> dict:
 def log_view(log: JudgeLog, full: bool) -> dict:
     data = {"case_id": log.case_id, "result": log.result, "score": log.score,
             "time_used": log.time_used, "message": sanitize_error(log.message),
-            "stderr": sanitize_error(log.stderr)}
+            "stderr": sanitize_error(log.stderr), "created_at": iso(log.created_at)}
     if full or not log.is_hidden:
         data.update({"stdout": log.stdout, "expected_output": log.expected_output})
     if full:

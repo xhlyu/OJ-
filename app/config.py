@@ -8,6 +8,8 @@ TEMP_DIR = Path(os.getenv("OJ_TEMP_DIR", BASE_DIR / "temp"))
 BACKUP_DIR = Path(os.getenv("OJ_BACKUP_DIR", BASE_DIR / "backups"))
 DATABASE_PATH = Path(os.getenv("OJ_DATABASE_PATH", DATA_DIR / "oj.db"))
 SESSION_SECRET = os.getenv("OJ_SESSION_SECRET", "development-only-change-me")
+SESSION_HTTPS_ONLY = os.getenv("OJ_SESSION_HTTPS_ONLY", "false").lower() == "true"
+SESSION_MAX_AGE = int(os.getenv("OJ_SESSION_MAX_AGE", "86400"))
 ADMIN_USERNAME = os.getenv("OJ_ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("OJ_ADMIN_PASSWORD", "admin12345")
 MAX_SOURCE_SIZE = 64 * 1024

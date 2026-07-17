@@ -16,6 +16,8 @@ def test_bcrypt_byte_limit_and_username_whitespace():
         response = client.post("/api/auth/register", json={"username": f"bytes{time.time_ns() % 1000000}", "password": too_many_bytes})
         assert response.status_code == 422
         assert response.json()["code"] == 422
+        assert client.post("/api/auth/register", json={"username": "bad name", "password": "password123"}).status_code == 422
+        assert client.post("/api/auth/register", json={"username": f"weak{time.time_ns() % 10000}", "password": "abcdefgh"}).status_code == 422
 
 
 def test_log_search_creates_audit_and_returns_timestamp():

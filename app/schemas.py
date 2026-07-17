@@ -14,6 +14,8 @@ class Credentials(BaseModel):
     def username_must_not_have_outer_whitespace(cls, value: str) -> str:
         if value != value.strip():
             raise ValueError("username cannot start or end with whitespace")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+            raise ValueError("username may only contain letters, numbers, underscores, and hyphens")
         return value
 
     @field_validator("password")
@@ -21,6 +23,8 @@ class Credentials(BaseModel):
     def password_must_fit_bcrypt(cls, value: str) -> str:
         if len(value.encode("utf-8")) > 72:
             raise ValueError("password must not exceed 72 UTF-8 bytes")
+        if not re.search(r"[A-Za-z]", value) or not re.search(r"[0-9]", value):
+            raise ValueError("password must contain at least one letter and one number")
         return value
 
 

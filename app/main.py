@@ -15,6 +15,7 @@ from app.config import (ADMIN_PASSWORD, ADMIN_USERNAME, BASE_DIR, SESSION_HTTPS_
 from app.database import Base, SessionLocal, engine
 from app.models import Submission, User
 from app.routers import admin, auth_users, problems, submissions
+from app.seed import seed_demo_problems
 
 
 @asynccontextmanager
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
         if not db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
             db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin"))
             db.commit()
+        seed_demo_problems(db)
         now = datetime.now(timezone.utc)
         db.execute(update(Submission).where(Submission.status.in_(["pending", "running"])).values(
             status="failed", result="SE", finished_at=now

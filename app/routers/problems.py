@@ -33,7 +33,7 @@ def apply_problem(problem: Problem, body: ProblemIn) -> None:
 @router.get("/problems")
 async def list_problems(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                         user: User = Depends(current_user), db: Session = Depends(get_db)):
-    items = db.scalars(select(Problem).order_by(Problem.id)
+    items = db.scalars(select(Problem).order_by(Problem.id.not_like("DEMO_%"), Problem.id)
                        .offset((page - 1) * page_size).limit(page_size)).all()
     total = db.scalar(select(func.count()).select_from(Problem))
     summaries = [{k: problem_view(x)[k] for k in ("id", "title", "difficulty", "tags", "time_limit", "memory_limit")} for x in items]

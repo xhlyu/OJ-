@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Mini OJ", lifespan=lifespan)
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax", httponly=True)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax")
 for router in (auth_users.router, problems.router, submissions.router, admin.router):
     app.include_router(router, prefix="/api")
 

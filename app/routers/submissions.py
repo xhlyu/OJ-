@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -10,19 +10,20 @@ from app.database import get_db
 from app.models import AuditLog, JudgeLog, Problem, Submission, User
 from app.schemas import SubmissionIn
 from app.serializers import log_view, submission_view
-from app.services import schedule_submission
+from app.services import evaluate_submission
 from app.utils import iso, response
 
 router = APIRouter()
 
 
 @router.post("/submissions")
-async def create_submission(body: SubmissionIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+async def create_submission(body: SubmissionIn, background_tasks: BackgroundTasks,
+                            user: User = Depends(current_user), db: Session = Depends(get_db)):
     if len(body.source_code.encode("utf-8")) > MAX_SOURCE_SIZE: raise HTTPException(422, "source code exceeds 64 KiB")
     if not db.get(Problem, body.problem_id): raise HTTPException(404, "problem not found")
     item = Submission(user_id=user.id, problem_id=body.problem_id, language=body.language, source_code=body.source_code)
     db.add(item); db.commit()
-    schedule_submission(item.id)
+    background_tasks.add_task(evaluate_submission, item.id)
     return response({"submission_id": item.id, "status": "pending"}, "submission accepted", 202)
 
 
@@ -50,14 +51,15 @@ async def get_submission(submission_id: str, user: User = Depends(current_user),
 
 
 @router.post("/submissions/{submission_id}/rejudge")
-async def rejudge(submission_id: str, operator: User = Depends(teacher), db: Session = Depends(get_db)):
+async def rejudge(submission_id: str, background_tasks: BackgroundTasks,
+                  operator: User = Depends(teacher), db: Session = Depends(get_db)):
     item = db.get(Submission, submission_id)
     if not item: raise HTTPException(404, "submission not found")
     if item.status not in {"finished", "failed"}: raise HTTPException(409, "submission is not ready for rejudge")
     item.status="pending"; item.result=None; item.score=0; item.total_time=None; item.started_at=None; item.finished_at=None
     db.execute(delete(JudgeLog).where(JudgeLog.submission_id == item.id))
     db.add(AuditLog(operator_id=operator.id, action="REJUDGE_SUBMISSION", target_type="submission", target_id=item.id))
-    db.commit(); schedule_submission(item.id)
+    db.commit(); background_tasks.add_task(evaluate_submission, item.id)
     return response({"submission_id": item.id, "status": "pending"}, "rejudge accepted", 202)
 
 

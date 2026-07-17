@@ -49,6 +49,11 @@ async def validation_error(_: Request, exc: RequestValidationError):
     ))
 
 
+@app.exception_handler(Exception)
+async def internal_error(_: Request, __: Exception):
+    return JSONResponse(status_code=500, content={"code": 500, "message": "internal server error", "data": None})
+
+
 @app.get("/", include_in_schema=False)
 async def frontend():
     return FileResponse(BASE_DIR / "frontend" / "index.html")

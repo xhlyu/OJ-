@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from pathlib import Path
 import shutil
 import sys
 import time
@@ -71,7 +70,7 @@ async def run_judge(source_code: str, test_cases, time_limit: float) -> tuple[st
                 results.append(CaseResult(case.case_id, result, score, elapsed, proc.returncode, case.input_data,
                                           truncate_text(stdout), sanitize_error(stderr), case.expected_output,
                                           message, case.is_hidden))
-                if result in {"RE"}:
+                if result == "RE":
                     break
             except Exception as exc:
                 results.append(CaseResult(case.case_id, "SE", 0, time.perf_counter() - started, None,

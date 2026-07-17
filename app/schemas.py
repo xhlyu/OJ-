@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Credentials(BaseModel):
@@ -58,6 +58,13 @@ class SubmissionIn(BaseModel):
     problem_id: str
     language: Literal["python"] = "python"
     source_code: str = Field(min_length=1)
+
+    @field_validator("source_code")
+    @classmethod
+    def source_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("source_code cannot be blank")
+        return value
 
 
 class Page(BaseModel):

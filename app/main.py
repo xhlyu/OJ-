@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import select
@@ -36,7 +37,10 @@ async def http_error(_: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error(_: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=422, content={"code": 422, "message": "validation error", "data": exc.errors()})
+    return JSONResponse(status_code=422, content=jsonable_encoder(
+        {"code": 422, "message": "validation error", "data": exc.errors()},
+        custom_encoder={ValueError: str},
+    ))
 
 
 @app.get("/", include_in_schema=False)

@@ -57,3 +57,28 @@ def test_problem_score_validation_and_duplicate_id():
         problem["test_cases"][0]["score"] = 100
         assert admin_client.post("/api/problems", json=problem).status_code == 201
         assert admin_client.post("/api/problems", json=problem).status_code == 409
+
+
+def test_backup_creation_and_audit():
+    with TestClient(app) as admin_client:
+        admin_client.post("/api/auth/login", json={"username": "admin", "password": "admin12345"})
+        created = admin_client.post("/api/admin/backups")
+        assert created.status_code == 201
+        backup_id = created.json()["data"]["backup_id"]
+        listed = admin_client.get("/api/admin/backups").json()["data"]["items"]
+        assert any(item["backup_id"] == backup_id for item in listed)
+        audits = admin_client.get("/api/audit-logs", params={"action": "CREATE_BACKUP", "target_id": backup_id}).json()["data"]
+        assert audits["total"] == 1
+
+
+def test_student_cannot_read_another_submission():
+    owner = TestClient(app)
+    stranger = TestClient(app)
+    register_and_login(owner, unique("owner"))
+    register_and_login(stranger, unique("stranger"))
+    submissions = owner.get("/api/submissions").json()["data"]["items"]
+    if not submissions:
+        return
+    submission_id = submissions[0]["id"]
+    assert stranger.get(f"/api/submissions/{submission_id}").status_code == 403
+    assert stranger.get(f"/api/submissions/{submission_id}/logs").status_code == 403

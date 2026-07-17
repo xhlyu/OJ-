@@ -1,23 +1,49 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mini OJ</title><style>
-body{font-family:system-ui;max-width:1000px;margin:30px auto;padding:0 16px;background:#f5f7fb;color:#172033}nav,section{background:#fff;padding:18px;margin:12px 0;border-radius:10px}input,textarea,button,select{padding:9px;margin:5px}textarea{width:95%;height:220px}button{cursor:pointer}.error{color:#b42318}pre{white-space:pre-wrap;background:#f0f2f5;padding:12px}
-</style></head><body><h1>Mini Online Judge</h1>
-<nav><span id="who">未登录</span><button onclick="logout()">登出</button></nav>
-<section id="login"><h2>注册 / 登录</h2><input id="username" placeholder="用户名"><input id="password" type="password" placeholder="密码"><button onclick="auth('login')">登录</button><button onclick="auth('register')">注册</button></section>
-<section><h2>题目</h2><button onclick="loadProblems()">刷新</button><div id="problems"></div></section>
-<section><h2>提交代码</h2><input id="problemId" placeholder="题目编号"><textarea id="code">a, b = map(int, input().split())
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mini OJ</title>
+  <style>
+    body { font-family: system-ui; max-width: 1050px; margin: 30px auto; padding: 0 16px; background: #f5f7fb; color: #172033; }
+    nav, section { background: #fff; padding: 18px; margin: 12px 0; border-radius: 10px; }
+    input, textarea, button, select { padding: 9px; margin: 5px; }
+    textarea { width: 95%; height: 220px; }
+    button { cursor: pointer; }
+    pre { white-space: pre-wrap; background: #f0f2f5; padding: 12px; min-height: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Mini Online Judge</h1>
+  <nav><span id="who">未登录</span><button onclick="logout()">登出</button></nav>
+  <section><h2>注册 / 登录</h2><input id="username" placeholder="用户名"><input id="password" type="password" placeholder="密码"><button onclick="auth('login')">登录</button><button onclick="auth('register')">注册</button></section>
+  <section><h2>题目</h2><button onclick="loadProblems()">刷新</button><div id="problems"></div></section>
+  <section><h2>提交 Python 代码</h2><input id="problemId" placeholder="题目编号"><textarea id="code">a, b = map(int, input().split())
 print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
-<section><h2>我的提交</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
-<pre id="message"></pre>
-<script>
-const msg=x=>document.getElementById('message').textContent=typeof x==='string'?x:JSON.stringify(x,null,2);
-async function api(path,opt={}){opt.credentials='include';if(opt.body){opt.headers={'Content-Type':'application/json'}}const r=await fetch('/api'+path,opt);const j=await r.json();if(!r.ok)throw new Error(j.message);return j.data}
-async function auth(kind){try{const d=await api('/auth/'+kind,{method:'POST',body:JSON.stringify({username:username.value,password:password.value})});msg(d);await me()}catch(e){msg(e.message)}}
-async function me(){try{const d=await api('/auth/me');who.textContent=d.username+' ('+d.role+')'}catch{who.textContent='未登录'}}
-async function logout(){await api('/auth/logout',{method:'POST'});await me()}
-async function loadProblems(){try{const d=await api('/problems');problems.innerHTML=d.items.map(x=>`<p><b>${x.id}</b> ${x.title} [${x.difficulty}]</p>`).join('')}catch(e){msg(e.message)}}
-async function submitCode(){try{const d=await api('/submissions',{method:'POST',body:JSON.stringify({problem_id:problemId.value,language:'python',source_code:code.value})});msg(d);setTimeout(loadSubs,1200)}catch(e){msg(e.message)}}
-async function loadSubs(){try{const d=await api('/submissions');subs.innerHTML=d.items.map(x=>`<p><button onclick="details('${x.id}')">查看</button> ${x.problem_id} ${x.status} ${x.result||''} ${x.score}</p>`).join('')}catch(e){msg(e.message)}}
-async function details(id){try{msg(await api('/submissions/'+id+'/logs'))}catch(e){msg(e.message)}}me();
-</script></body></html>
+  <section><h2>提交记录</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
+  <section id="teacherPanel" hidden><h2>教师题目管理</h2><p>填写完整题目 JSON 后创建或更新。</p><textarea id="problemJson">{"id":"P1001","title":"A+B Problem","description":"输入两个整数并输出和。","input_description":"一行两个整数。","output_description":"输出它们的和。","samples":[{"input":"1 2\n","output":"3\n"}],"constraints":"|a|, |b| <= 10^9","time_limit":1,"memory_limit":128,"difficulty":"easy","tags":["基础"],"test_cases":[{"case_id":"public","input":"1 2\n","output":"3\n","score":50,"is_hidden":false},{"case_id":"hidden","input":"5 7\n","output":"12\n","score":50,"is_hidden":true}]}</textarea><button onclick="saveProblem('POST')">创建</button><button onclick="saveProblem('PUT')">更新</button><input id="deleteProblemId" placeholder="删除题目编号"><button onclick="deleteProblem()">删除</button></section>
+  <section id="adminPanel" hidden><h2>管理员</h2><button onclick="loadUsers()">刷新用户</button><button onclick="createBackup()">创建备份</button><button onclick="loadBackups()">查看备份</button><div id="users"></div><div id="backupList"></div></section>
+  <pre id="message"></pre>
+  <script>
+    let currentUser = null;
+    const byId = id => document.getElementById(id);
+    const msg = value => byId('message').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    async function api(path, options = {}) { options.credentials = 'include'; if (options.body) options.headers = {'Content-Type': 'application/json'}; const response = await fetch('/api' + path, options); const payload = await response.json(); if (!response.ok) throw new Error(payload.message); return payload.data; }
+    async function auth(kind) { try { msg(await api('/auth/' + kind, {method: 'POST', body: JSON.stringify({username: byId('username').value, password: byId('password').value})})); await me(); } catch (error) { msg(error.message); } }
+    async function me() { try { currentUser = await api('/auth/me'); byId('who').textContent = `${currentUser.username} (${currentUser.role})`; byId('teacherPanel').hidden = !['teacher', 'admin'].includes(currentUser.role); byId('adminPanel').hidden = currentUser.role !== 'admin'; await loadProblems(); await loadSubs(); } catch { currentUser = null; byId('who').textContent = '未登录'; byId('teacherPanel').hidden = true; byId('adminPanel').hidden = true; } }
+    async function logout() { try { await api('/auth/logout', {method: 'POST'}); await me(); } catch (error) { msg(error.message); } }
+    async function loadProblems() { try { const data = await api('/problems'); byId('problems').innerHTML = data.items.map(item => `<p><button onclick="openProblem('${item.id}')">详情</button> <b>${item.id}</b> ${item.title} [${item.difficulty}]</p>`).join('') || '暂无题目'; } catch (error) { msg(error.message); } }
+    async function openProblem(id) { try { const data = await api('/problems/' + encodeURIComponent(id)); byId('problemId').value = id; if (currentUser && ['teacher', 'admin'].includes(currentUser.role)) byId('problemJson').value = JSON.stringify(data, null, 2); msg(data); } catch (error) { msg(error.message); } }
+    async function submitCode() { try { const data = await api('/submissions', {method: 'POST', body: JSON.stringify({problem_id: byId('problemId').value, language: 'python', source_code: byId('code').value})}); msg(data); setTimeout(loadSubs, 1000); } catch (error) { msg(error.message); } }
+    async function loadSubs() { try { const data = await api('/submissions'); byId('subs').innerHTML = data.items.map(item => `<p><button onclick="details('${item.id}')">查看</button> ${item.problem_id} ${item.status} ${item.result || ''} ${item.score}</p>`).join('') || '暂无提交'; } catch (error) { msg(error.message); } }
+    async function details(id) { try { msg(await api('/submissions/' + id + '/logs')); } catch (error) { msg(error.message); } }
+    async function saveProblem(method) { try { const body = JSON.parse(byId('problemJson').value); const path = method === 'POST' ? '/problems' : '/problems/' + encodeURIComponent(body.id); msg(await api(path, {method, body: JSON.stringify(body)})); await loadProblems(); } catch (error) { msg(error.message); } }
+    async function deleteProblem() { if (!confirm('确认删除题目？')) return; try { msg(await api('/problems/' + encodeURIComponent(byId('deleteProblemId').value), {method: 'DELETE'})); await loadProblems(); } catch (error) { msg(error.message); } }
+    async function loadUsers() { try { const data = await api('/users?page_size=100'); byId('users').innerHTML = data.items.map(user => `<p>${user.username} <select id="role-${user.id}"><option ${user.role === 'student' ? 'selected' : ''}>student</option><option ${user.role === 'teacher' ? 'selected' : ''}>teacher</option><option ${user.role === 'admin' ? 'selected' : ''}>admin</option></select><label><input id="active-${user.id}" type="checkbox" ${user.is_active ? 'checked' : ''}>启用</label><button onclick="updateUser('${user.id}')">保存</button></p>`).join(''); } catch (error) { msg(error.message); } }
+    async function updateUser(id) { try { msg(await api('/users/' + id, {method: 'PUT', body: JSON.stringify({role: byId('role-' + id).value, is_active: byId('active-' + id).checked})})); await loadUsers(); } catch (error) { msg(error.message); } }
+    async function createBackup() { try { msg(await api('/admin/backups', {method: 'POST'})); await loadBackups(); } catch (error) { msg(error.message); } }
+    async function loadBackups() { try { const data = await api('/admin/backups'); byId('backupList').innerHTML = data.items.map(item => `<p>${item.backup_id} ${item.created_at}</p>`).join('') || '暂无备份'; } catch (error) { msg(error.message); } }
+    me();
+  </script>
+</body>
+</html>

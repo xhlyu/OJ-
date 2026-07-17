@@ -33,7 +33,7 @@ def test_admin_user_management_and_audit_log():
         student = TestClient(app)
         username = unique("managed")
         register_and_login(student, username)
-        users = admin_client.get("/api/users", params={"page_size": 100}).json()["data"]["items"]
+        users = admin_client.get("/api/users", params={"username": username}).json()["data"]["items"]
         target = next(item for item in users if item["username"] == username)
         updated = admin_client.put(f"/api/users/{target['id']}", json={"role": "teacher", "is_active": False})
         assert updated.status_code == 200
@@ -51,7 +51,7 @@ def test_admin_cannot_disable_self_and_teacher_cannot_manage_users():
         teacher_client = TestClient(app)
         username = unique("teacher")
         register_and_login(teacher_client, username)
-        users = admin_client.get("/api/users", params={"page_size": 100}).json()["data"]["items"]
+        users = admin_client.get("/api/users", params={"username": username}).json()["data"]["items"]
         teacher = next(item for item in users if item["username"] == username)
         admin_client.put(f"/api/users/{teacher['id']}", json={"role": "teacher", "is_active": True})
         assert teacher_client.get("/api/users").status_code == 403

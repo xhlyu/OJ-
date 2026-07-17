@@ -62,11 +62,29 @@ def test_backup_restore_rolls_back_new_user():
         created = admin_client.post("/api/admin/backups")
         backup_id = created.json()["data"]["backup_id"]
         assert admin_client.post("/api/auth/register", json={"username": username, "password": "password123"}).status_code == 201
-        users_before_restore = admin_client.get("/api/users", params={"page_size": 100}).json()["data"]["items"]
+        users_before_restore = admin_client.get("/api/users", params={"username": username}).json()["data"]["items"]
         assert any(item["username"] == username for item in users_before_restore)
         restored = admin_client.post(f"/api/admin/backups/{backup_id}/restore")
         assert restored.status_code == 200
-        users_after_restore = admin_client.get("/api/users", params={"page_size": 100}).json()["data"]["items"]
+        users_after_restore = admin_client.get("/api/users", params={"username": username}).json()["data"]["items"]
         assert all(item["username"] != username for item in users_after_restore)
         audits = admin_client.get("/api/audit-logs", params={"action": "RESTORE_BACKUP", "target_id": backup_id}).json()["data"]["items"]
         assert audits[0]["success"] is True
+
+
+def test_tampered_backup_is_rejected_by_checksum():
+    with TestClient(app) as admin_client:
+        login_admin(admin_client)
+        created = admin_client.post("/api/admin/backups")
+        backup_id = created.json()["data"]["backup_id"]
+        database_file = BACKUP_DIR / backup_id / "oj.db"
+        original = database_file.read_bytes()
+        database_file.write_bytes(original + b"tampered")
+        try:
+            restored = admin_client.post(f"/api/admin/backups/{backup_id}/restore")
+            assert restored.status_code == 400
+            assert "checksum mismatch" in restored.json()["message"]
+            audits = admin_client.get("/api/audit-logs", params={"target_id": backup_id}).json()["data"]["items"]
+            assert audits[0]["success"] is False
+        finally:
+            database_file.write_bytes(original)

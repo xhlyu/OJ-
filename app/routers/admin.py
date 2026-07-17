@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
-from pathlib import Path
 import shutil
 import sqlite3
 
@@ -17,6 +17,14 @@ from app.models import AuditLog, Backup, User
 from app.utils import iso, response, validate_time_range
 
 router = APIRouter()
+
+
+def file_sha256(path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def write_restore_audit(operator_id: str, backup_id: str, success: bool, detail: str | None = None) -> None:
@@ -54,15 +62,34 @@ async def create_backup(operator: User = Depends(admin), db: Session = Depends(g
     db.add(Backup(id=backup_id, created_at=created_at))
     db.add(AuditLog(operator_id=operator.id, action="CREATE_BACKUP", target_type="backup", target_id=backup_id))
     db.commit()
-    folder = BACKUP_DIR / backup_id; folder.mkdir(parents=True)
+    folder = BACKUP_DIR / backup_id
+    folder.mkdir(parents=True)
     target = folder / "oj.db"
-    source_conn = sqlite3.connect(DATABASE_PATH)
-    target_conn = sqlite3.connect(target)
-    try: source_conn.backup(target_conn)
-    finally: source_conn.close(); target_conn.close()
-    manifest = {"backup_id": backup_id, "created_at": created_at.isoformat(),
-                "storage": "sqlite", "files": ["oj.db"]}
-    (folder / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    try:
+        source_conn = sqlite3.connect(DATABASE_PATH)
+        target_conn = sqlite3.connect(target)
+        try:
+            source_conn.backup(target_conn)
+        finally:
+            source_conn.close()
+            target_conn.close()
+        manifest = {
+            "backup_id": backup_id,
+            "created_at": created_at.isoformat(),
+            "storage": "sqlite",
+            "files": ["oj.db"],
+            "sha256": {"oj.db": file_sha256(target)},
+        }
+        (folder / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    except Exception as exc:
+        shutil.rmtree(folder, ignore_errors=True)
+        backup = db.get(Backup, backup_id)
+        if backup:
+            db.delete(backup)
+        db.add(AuditLog(operator_id=operator.id, action="CREATE_BACKUP", target_type="backup",
+                        target_id=backup_id, success=False, detail=str(exc)))
+        db.commit()
+        raise HTTPException(500, "backup creation failed") from exc
     return response({"backup_id": backup_id, "created_at": manifest["created_at"]}, "backup created", 201)
 
 
@@ -77,29 +104,40 @@ async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Se
     if not backup_id.startswith("backup_") or any(x in backup_id for x in ("/", "\\", "..")):
         write_restore_audit(operator.id, backup_id, False, "invalid backup id")
         raise HTTPException(400, "invalid backup id")
-    folder = BACKUP_DIR / backup_id; manifest_path = folder / "manifest.json"; source = folder / "oj.db"
+    folder = BACKUP_DIR / backup_id
+    manifest_path = folder / "manifest.json"
+    source = folder / "oj.db"
     if not manifest_path.is_file() or not source.is_file():
         write_restore_audit(operator.id, backup_id, False, "backup not found")
         raise HTTPException(404, "backup not found")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("storage") != "sqlite" or "oj.db" not in manifest.get("files", []): raise ValueError("invalid manifest")
+        if manifest.get("backup_id") != backup_id:
+            raise ValueError("backup id does not match manifest")
+        if manifest.get("storage") != "sqlite" or "oj.db" not in manifest.get("files", []):
+            raise ValueError("invalid manifest")
+        expected_hash = manifest.get("sha256", {}).get("oj.db")
+        if not expected_hash or file_sha256(source) != expected_hash:
+            raise ValueError("backup checksum mismatch")
         check = sqlite3.connect(source)
         try:
             check_result = check.execute("PRAGMA quick_check").fetchone()
         finally:
             check.close()
-        if not check_result or check_result[0] != "ok": raise ValueError("database integrity check failed")
+        if not check_result or check_result[0] != "ok":
+            raise ValueError("database integrity check failed")
     except Exception as exc:
         write_restore_audit(operator.id, backup_id, False, str(exc))
         raise HTTPException(400, f"invalid backup: {exc}")
     safety = DATABASE_PATH.with_suffix(".restore-safety")
-    engine.dispose(); shutil.copy2(DATABASE_PATH, safety)
+    engine.dispose()
+    shutil.copy2(DATABASE_PATH, safety)
     try:
         shutil.copy2(source, DATABASE_PATH)
         safety.unlink(missing_ok=True)
     except Exception:
-        shutil.copy2(safety, DATABASE_PATH); safety.unlink(missing_ok=True)
+        shutil.copy2(safety, DATABASE_PATH)
+        safety.unlink(missing_ok=True)
         write_restore_audit(operator.id, backup_id, False, "database replacement failed")
         raise HTTPException(500, "restore failed")
     write_restore_audit(operator.id, backup_id, True)

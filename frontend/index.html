@@ -22,7 +22,7 @@
 print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
   <section><h2>提交记录</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
   <section id="teacherPanel" hidden><h2>教师题目管理</h2><p>填写完整题目 JSON 后创建或更新。</p><textarea id="problemJson">{"id":"P1001","title":"A+B Problem","description":"输入两个整数并输出和。","input_description":"一行两个整数。","output_description":"输出它们的和。","samples":[{"input":"1 2\n","output":"3\n"}],"constraints":"|a|, |b| <= 10^9","time_limit":1,"memory_limit":128,"difficulty":"easy","tags":["基础"],"test_cases":[{"case_id":"public","input":"1 2\n","output":"3\n","score":50,"is_hidden":false},{"case_id":"hidden","input":"5 7\n","output":"12\n","score":50,"is_hidden":true}]}</textarea><button onclick="saveProblem('POST')">创建</button><button onclick="saveProblem('PUT')">更新</button><input id="deleteProblemId" placeholder="删除题目编号"><button onclick="deleteProblem()">删除</button></section>
-  <section id="adminPanel" hidden><h2>管理员</h2><button onclick="loadUsers()">刷新用户</button><button onclick="createBackup()">创建备份</button><button onclick="loadBackups()">查看备份</button><div id="users"></div><div id="backupList"></div></section>
+  <section id="adminPanel" hidden><h2>管理员</h2><button onclick="loadUsers()">刷新用户</button><button onclick="createBackup()">创建备份</button><button onclick="loadBackups()">查看备份</button><input id="restoreBackupId" placeholder="备份编号"><button onclick="restoreBackup()">恢复备份</button><div id="users"></div><div id="backupList"></div></section>
   <pre id="message"></pre>
   <script>
     let currentUser = null;
@@ -42,7 +42,8 @@ print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
     async function loadUsers() { try { const data = await api('/users?page_size=100'); byId('users').innerHTML = data.items.map(user => `<p>${user.username} <select id="role-${user.id}"><option ${user.role === 'student' ? 'selected' : ''}>student</option><option ${user.role === 'teacher' ? 'selected' : ''}>teacher</option><option ${user.role === 'admin' ? 'selected' : ''}>admin</option></select><label><input id="active-${user.id}" type="checkbox" ${user.is_active ? 'checked' : ''}>启用</label><button onclick="updateUser('${user.id}')">保存</button></p>`).join(''); } catch (error) { msg(error.message); } }
     async function updateUser(id) { try { msg(await api('/users/' + id, {method: 'PUT', body: JSON.stringify({role: byId('role-' + id).value, is_active: byId('active-' + id).checked})})); await loadUsers(); } catch (error) { msg(error.message); } }
     async function createBackup() { try { msg(await api('/admin/backups', {method: 'POST'})); await loadBackups(); } catch (error) { msg(error.message); } }
-    async function loadBackups() { try { const data = await api('/admin/backups'); byId('backupList').innerHTML = data.items.map(item => `<p>${item.backup_id} ${item.created_at}</p>`).join('') || '暂无备份'; } catch (error) { msg(error.message); } }
+    async function loadBackups() { try { const data = await api('/admin/backups'); byId('backupList').innerHTML = data.items.map(item => `<p><button onclick="byId('restoreBackupId').value='${item.backup_id}'">选择</button> ${item.backup_id} ${item.created_at}</p>`).join('') || '暂无备份'; } catch (error) { msg(error.message); } }
+    async function restoreBackup() { if (!confirm('恢复会覆盖当前系统数据，确认继续？')) return; try { const id = byId('restoreBackupId').value; msg(await api('/admin/backups/' + encodeURIComponent(id) + '/restore', {method: 'POST'})); await me(); } catch (error) { msg(error.message); } }
     me();
   </script>
 </body>

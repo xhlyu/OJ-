@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini OJ</title><style>
+body{font-family:system-ui;max-width:1000px;margin:30px auto;padding:0 16px;background:#f5f7fb;color:#172033}nav,section{background:#fff;padding:18px;margin:12px 0;border-radius:10px}input,textarea,button,select{padding:9px;margin:5px}textarea{width:95%;height:220px}button{cursor:pointer}.error{color:#b42318}pre{white-space:pre-wrap;background:#f0f2f5;padding:12px}
+</style></head><body><h1>Mini Online Judge</h1>
+<nav><span id="who">未登录</span><button onclick="logout()">登出</button></nav>
+<section id="login"><h2>注册 / 登录</h2><input id="username" placeholder="用户名"><input id="password" type="password" placeholder="密码"><button onclick="auth('login')">登录</button><button onclick="auth('register')">注册</button></section>
+<section><h2>题目</h2><button onclick="loadProblems()">刷新</button><div id="problems"></div></section>
+<section><h2>提交代码</h2><input id="problemId" placeholder="题目编号"><textarea id="code">a, b = map(int, input().split())
+print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
+<section><h2>我的提交</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
+<pre id="message"></pre>
+<script>
+const msg=x=>document.getElementById('message').textContent=typeof x==='string'?x:JSON.stringify(x,null,2);
+async function api(path,opt={}){opt.credentials='include';if(opt.body){opt.headers={'Content-Type':'application/json'}}const r=await fetch('/api'+path,opt);const j=await r.json();if(!r.ok)throw new Error(j.message);return j.data}
+async function auth(kind){try{const d=await api('/auth/'+kind,{method:'POST',body:JSON.stringify({username:username.value,password:password.value})});msg(d);await me()}catch(e){msg(e.message)}}
+async function me(){try{const d=await api('/auth/me');who.textContent=d.username+' ('+d.role+')'}catch{who.textContent='未登录'}}
+async function logout(){await api('/auth/logout',{method:'POST'});await me()}
+async function loadProblems(){try{const d=await api('/problems');problems.innerHTML=d.items.map(x=>`<p><b>${x.id}</b> ${x.title} [${x.difficulty}]</p>`).join('')}catch(e){msg(e.message)}}
+async function submitCode(){try{const d=await api('/submissions',{method:'POST',body:JSON.stringify({problem_id:problemId.value,language:'python',source_code:code.value})});msg(d);setTimeout(loadSubs,1200)}catch(e){msg(e.message)}}
+async function loadSubs(){try{const d=await api('/submissions');subs.innerHTML=d.items.map(x=>`<p><button onclick="details('${x.id}')">查看</button> ${x.problem_id} ${x.status} ${x.result||''} ${x.score}</p>`).join('')}catch(e){msg(e.message)}}
+async function details(id){try{msg(await api('/submissions/'+id+'/logs'))}catch(e){msg(e.message)}}me();
+</script></body></html>

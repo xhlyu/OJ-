@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from datetime import datetime
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -28,8 +31,11 @@ async def create_submission(body: SubmissionIn, background_tasks: BackgroundTask
 
 
 @router.get("/submissions")
-async def list_submissions(page: int = 1, page_size: int = 20, problem_id: str | None = None,
-                           user_id: str | None = None, status: str | None = None, result: str | None = None,
+async def list_submissions(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                           problem_id: str | None = None, user_id: str | None = None,
+                           status: Literal["pending", "running", "finished", "failed"] | None = None,
+                           result: Literal["AC", "WA", "RE", "TLE", "SE"] | None = None,
+                           start_time: datetime | None = None, end_time: datetime | None = None,
                            user: User = Depends(current_user), db: Session = Depends(get_db)):
     query = select(Submission)
     if user.role == "student": query = query.where(Submission.user_id == user.id)
@@ -37,6 +43,8 @@ async def list_submissions(page: int = 1, page_size: int = 20, problem_id: str |
     if problem_id: query = query.where(Submission.problem_id == problem_id)
     if status: query = query.where(Submission.status == status)
     if result: query = query.where(Submission.result == result)
+    if start_time: query = query.where(Submission.created_at >= start_time)
+    if end_time: query = query.where(Submission.created_at <= end_time)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
     items = db.scalars(query.order_by(Submission.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).all()
     return response({"items": [submission_view(x, False) for x in items], "total": total, "page": page, "page_size": page_size})
@@ -76,9 +84,20 @@ async def submission_logs(submission_id: str, user: User = Depends(current_user)
 
 
 @router.get("/logs")
-async def all_logs(page: int = 1, page_size: int = 20, submission_id: str | None = None,
+async def all_logs(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+                   submission_id: str | None = None, problem_id: str | None = None,
+                   user_id: str | None = None,
+                   result: Literal["AC", "WA", "RE", "TLE", "SE"] | None = None,
+                   start_time: datetime | None = None, end_time: datetime | None = None,
                    _: User = Depends(teacher), db: Session = Depends(get_db)):
-    query = select(JudgeLog)
+    query = select(JudgeLog).join(Submission, Submission.id == JudgeLog.submission_id)
     if submission_id: query = query.where(JudgeLog.submission_id == submission_id)
+    if problem_id: query = query.where(Submission.problem_id == problem_id)
+    if user_id: query = query.where(Submission.user_id == user_id)
+    if result: query = query.where(JudgeLog.result == result)
+    if start_time: query = query.where(JudgeLog.created_at >= start_time)
+    if end_time: query = query.where(JudgeLog.created_at <= end_time)
+    total = db.scalar(select(func.count()).select_from(query.subquery()))
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
-    return response({"items": [log_view(x, True) | {"submission_id": x.submission_id} for x in items], "page": page, "page_size": page_size})
+    return response({"items": [log_view(x, True) | {"submission_id": x.submission_id} for x in items],
+                     "total": total, "page": page, "page_size": page_size})

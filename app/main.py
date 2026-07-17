@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -6,12 +7,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.auth import hash_password
 from app.config import ADMIN_PASSWORD, ADMIN_USERNAME, BASE_DIR, SESSION_SECRET, ensure_directories
 from app.database import Base, SessionLocal, engine
-from app.models import User
+from app.models import Submission, User
 from app.routers import admin, auth_users, problems, submissions
 
 
@@ -21,6 +22,11 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         if not db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
             db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin")); db.commit()
+        now = datetime.now(timezone.utc)
+        db.execute(update(Submission).where(Submission.status.in_(["pending", "running"])).values(
+            status="failed", result="SE", finished_at=now
+        ))
+        db.commit()
     yield
 
 

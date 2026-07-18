@@ -41,6 +41,10 @@ pytest
 
 当前自动化测试覆盖项目的核心验收流程；详细人工验收步骤见 `report/acceptance-checklist.md`。
 
+pytest 自动使用 `work/pytest-runtime/` 下的隔离数据库、临时目录和备份目录，测试不会修改正式的 `data/oj.db`。
+
+SQLite 使用 WAL 和 5 秒 busy timeout 提高后台评测写入可靠性；恢复备份时会清理 WAL/SHM 文件，避免旧事务覆盖恢复结果。
+
 ## 已知限制
 
 - 基础模块仅评测 Python。

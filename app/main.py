@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 
 from app.auth import hash_password
 from app.config import (ADMIN_PASSWORD, ADMIN_USERNAME, BASE_DIR, SESSION_HTTPS_ONLY,
@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     ensure_directories()
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
+        db.execute(text("PRAGMA journal_mode=WAL"))
         if not db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
             db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin"))
             db.commit()

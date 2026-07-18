@@ -27,6 +27,21 @@ def file_sha256(path) -> str:
     return digest.hexdigest()
 
 
+def remove_sqlite_sidecars(database_path) -> None:
+    for suffix in ("-wal", "-shm"):
+        database_path.with_name(database_path.name + suffix).unlink(missing_ok=True)
+
+
+def sqlite_copy(source_path, target_path) -> None:
+    source_conn = sqlite3.connect(source_path)
+    target_conn = sqlite3.connect(target_path)
+    try:
+        source_conn.backup(target_conn)
+    finally:
+        source_conn.close()
+        target_conn.close()
+
+
 def write_restore_audit(operator_id: str, backup_id: str, success: bool, detail: str | None = None) -> None:
     with SessionLocal() as audit_db:
         audit_db.add(AuditLog(operator_id=operator_id, action="RESTORE_BACKUP", target_type="backup",
@@ -66,13 +81,7 @@ async def create_backup(operator: User = Depends(admin), db: Session = Depends(g
     folder.mkdir(parents=True)
     target = folder / "oj.db"
     try:
-        source_conn = sqlite3.connect(DATABASE_PATH)
-        target_conn = sqlite3.connect(target)
-        try:
-            source_conn.backup(target_conn)
-        finally:
-            source_conn.close()
-            target_conn.close()
+        sqlite_copy(DATABASE_PATH, target)
         manifest = {
             "backup_id": backup_id,
             "created_at": created_at.isoformat(),
@@ -130,12 +139,16 @@ async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Se
         write_restore_audit(operator.id, backup_id, False, str(exc))
         raise HTTPException(400, f"invalid backup: {exc}")
     safety = DATABASE_PATH.with_suffix(".restore-safety")
+    db.close()
     engine.dispose()
-    shutil.copy2(DATABASE_PATH, safety)
+    safety.unlink(missing_ok=True)
+    sqlite_copy(DATABASE_PATH, safety)
     try:
+        remove_sqlite_sidecars(DATABASE_PATH)
         shutil.copy2(source, DATABASE_PATH)
         safety.unlink(missing_ok=True)
     except Exception:
+        remove_sqlite_sidecars(DATABASE_PATH)
         shutil.copy2(safety, DATABASE_PATH)
         safety.unlink(missing_ok=True)
         write_restore_audit(operator.id, backup_id, False, "database replacement failed")

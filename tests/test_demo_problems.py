@@ -13,3 +13,9 @@ def test_demo_problems_are_seeded_and_listed_first():
         assert detail["title"] == "A+B 问题"
         assert "给定两个整数" in detail["description"]
         assert sum(case["score"] for case in detail["test_cases"]) == 100
+
+
+def test_frontend_contains_readable_problem_detail_fields():
+    html = open("frontend/index.html", encoding="utf-8").read()
+    for text in ("题目描述", "输入说明", "输出说明", "数据范围", "detailSamples", "开始作答"):
+        assert text in html

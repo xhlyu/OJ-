@@ -23,6 +23,8 @@ def test_auth_permissions_and_pagination_validation():
         assert student.get("/api/submissions?page_size=101").status_code == 422
         assert student.get("/api/submissions?status=invalid").status_code == 422
         assert student.post("/api/submissions", json={"problem_id": "P1001", "language": "python", "source_code": "   \n"}).status_code == 422
+        assert student.post("/api/submissions", json={"problem_id": "P1001", "language": "python",
+                                                      "source_code": "x" * (64 * 1024 + 1)}).status_code == 422
         assert student.post("/api/auth/logout").status_code == 200
         assert student.get("/api/auth/me").status_code == 401
 

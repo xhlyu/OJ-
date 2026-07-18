@@ -31,6 +31,17 @@ def test_time_range_validation():
         assert client.get("/api/audit-logs", params=params).status_code == 400
 
 
+def test_submission_filters_and_pagination_shape():
+    with TestClient(app) as client:
+        client.post("/api/auth/login", json={"username": "admin", "password": "admin12345"})
+        response = client.get("/api/submissions", params={"page": 1, "page_size": 5, "status": "finished"})
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["page"] == 1 and data["page_size"] == 5
+        assert len(data["items"]) <= 5
+        assert all(item["status"] == "finished" for item in data["items"])
+
+
 def test_database_persistence_across_app_lifespans():
     username = f"persistent{time.time_ns() % 100000000}"
     with TestClient(app) as client:

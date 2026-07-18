@@ -11,6 +11,9 @@
     textarea { width: 95%; height: 220px; }
     button { cursor: pointer; }
     pre { white-space: pre-wrap; background: #f0f2f5; padding: 12px; min-height: 30px; }
+    .problem-detail { border-left: 4px solid #2563eb; padding-left: 16px; }
+    .sample { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sample pre { margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -18,6 +21,7 @@
   <nav><span id="who">未登录</span><button onclick="logout()">登出</button></nav>
   <section><h2>注册 / 登录</h2><input id="username" placeholder="用户名"><input id="password" type="password" placeholder="密码"><button onclick="auth('login')">登录</button><button onclick="auth('register')">注册</button><p><b>用户名规则：</b>3–32 个字符，只能使用英文字母、数字、下划线和连字符，首尾不能有空格。</p><p><b>密码规则：</b>至少 8 个字符、最多 72 个 UTF-8 字节，必须同时包含至少一个字母和一个数字。</p></section>
   <section><h2>题目</h2><button onclick="loadProblems()">刷新</button><div id="problems"></div></section>
+  <section id="problemDetail" hidden class="problem-detail"><h2 id="detailTitle"></h2><p id="detailMeta"></p><h3>题目描述</h3><p id="detailDescription"></p><h3>输入说明</h3><p id="detailInput"></p><h3>输出说明</h3><p id="detailOutput"></p><h3>数据范围</h3><p id="detailConstraints"></p><h3>样例</h3><div id="detailSamples"></div><button onclick="focusSubmission()">开始作答</button></section>
   <section><h2>提交 Python 代码</h2><input id="problemId" placeholder="题目编号"><textarea id="code">a, b = map(int, input().split())
 print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
   <section><h2>提交记录</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
@@ -34,7 +38,9 @@ print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
     async function me() { try { currentUser = await api('/auth/me'); byId('who').textContent = `${currentUser.username} (${currentUser.role})`; byId('teacherPanel').hidden = !['teacher', 'admin'].includes(currentUser.role); byId('adminPanel').hidden = currentUser.role !== 'admin'; await loadProblems(); await loadSubs(); } catch { currentUser = null; byId('who').textContent = '未登录，请先登录后查看题目'; byId('problems').textContent = '登录后显示题目列表。可使用管理员账号 admin / admin12345。'; byId('subs').textContent = '登录后显示提交记录。'; byId('teacherPanel').hidden = true; byId('adminPanel').hidden = true; } }
     async function logout() { try { await api('/auth/logout', {method: 'POST'}); await me(); } catch (error) { msg(error.message); } }
     async function loadProblems() { try { const data = await api('/problems'); byId('problems').innerHTML = data.items.map(item => `<p><button onclick="openProblem('${item.id}')">查看题目</button> <b>${item.id}</b> ${item.title} [${item.difficulty}] ${item.tags.join(' / ')}</p>`).join('') || '暂无题目'; } catch (error) { msg(error.message); } }
-    async function openProblem(id) { try { const data = await api('/problems/' + encodeURIComponent(id)); byId('problemId').value = id; if (currentUser && ['teacher', 'admin'].includes(currentUser.role)) byId('problemJson').value = JSON.stringify(data, null, 2); msg(data); } catch (error) { msg(error.message); } }
+    async function openProblem(id) { try { const data = await api('/problems/' + encodeURIComponent(id)); byId('problemId').value = id; byId('problemDetail').hidden = false; byId('detailTitle').textContent = `${data.id} - ${data.title}`; byId('detailMeta').textContent = `难度：${data.difficulty} ｜ 时间限制：${data.time_limit}s ｜ 内存限制：${data.memory_limit}MB ｜ 标签：${data.tags.join('、') || '无'}`; byId('detailDescription').textContent = data.description; byId('detailInput').textContent = data.input_description; byId('detailOutput').textContent = data.output_description; byId('detailConstraints').textContent = data.constraints || '无'; byId('detailSamples').innerHTML = data.samples.map((sample, index) => `<div><b>样例 ${index + 1}</b><div class="sample"><div>输入<pre>${escapeHtml(sample.input)}</pre></div><div>输出<pre>${escapeHtml(sample.output)}</pre></div></div></div>`).join(''); if (currentUser && ['teacher', 'admin'].includes(currentUser.role)) byId('problemJson').value = JSON.stringify(data, null, 2); } catch (error) { msg(error.message); } }
+    function escapeHtml(value) { const element = document.createElement('div'); element.textContent = value; return element.innerHTML; }
+    function focusSubmission() { byId('code').focus(); byId('code').scrollIntoView({behavior: 'smooth'}); }
     async function submitCode() { try { const data = await api('/submissions', {method: 'POST', body: JSON.stringify({problem_id: byId('problemId').value, language: 'python', source_code: byId('code').value})}); msg(data); await pollSubmission(data.submission_id); } catch (error) { msg(error.message); } }
     async function pollSubmission(id) { for (let attempt = 0; attempt < 60; attempt++) { const item = await api('/submissions/' + id); msg(item); await loadSubs(); if (['finished', 'failed'].includes(item.status)) { await details(id); return; } await new Promise(resolve => setTimeout(resolve, 1000)); } msg('评测仍在进行，请稍后手动刷新。'); }
     async function loadSubs() { try { const data = await api('/submissions'); byId('subs').innerHTML = data.items.map(item => `<p><button onclick="details('${item.id}')">查看</button>${currentUser && ['teacher', 'admin'].includes(currentUser.role) && ['finished', 'failed'].includes(item.status) ? `<button onclick="rejudge('${item.id}')">重新评测</button>` : ''} ${item.problem_id} ${item.status} ${item.result || ''} ${item.score}</p>`).join('') || '暂无提交'; } catch (error) { msg(error.message); } }

@@ -19,3 +19,6 @@ def test_frontend_contains_readable_problem_detail_fields():
     html = open("frontend/index.html", encoding="utf-8").read()
     for text in ("题目描述", "输入说明", "输出说明", "数据范围", "detailSamples", "开始作答"):
         assert text in html
+    assert 'id="messagePanel"' in html
+    assert 'message-panel" hidden' in html
+    assert "hideMessage(); await me()" in html

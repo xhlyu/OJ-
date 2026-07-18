@@ -14,6 +14,8 @@
     .problem-detail { border-left: 4px solid #2563eb; padding-left: 16px; }
     .sample { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .sample pre { margin-top: 4px; }
+    .message-panel { position: relative; }
+    .message-panel button { position: absolute; top: 8px; right: 8px; }
   </style>
 </head>
 <body>
@@ -27,14 +29,15 @@ print(a + b)</textarea><button onclick="submitCode()">提交</button></section>
   <section><h2>提交记录</h2><button onclick="loadSubs()">刷新</button><div id="subs"></div></section>
   <section id="teacherPanel" hidden><h2>教师题目管理</h2><p>填写完整题目 JSON 后创建或更新。</p><textarea id="problemJson">{"id":"P1001","title":"A+B Problem","description":"输入两个整数并输出和。","input_description":"一行两个整数。","output_description":"输出它们的和。","samples":[{"input":"1 2\n","output":"3\n"}],"constraints":"|a|, |b| <= 10^9","time_limit":1,"memory_limit":128,"difficulty":"easy","tags":["基础"],"test_cases":[{"case_id":"public","input":"1 2\n","output":"3\n","score":50,"is_hidden":false},{"case_id":"hidden","input":"5 7\n","output":"12\n","score":50,"is_hidden":true}]}</textarea><button onclick="saveProblem('POST')">创建</button><button onclick="saveProblem('PUT')">更新</button><input id="deleteProblemId" placeholder="删除题目编号"><button onclick="deleteProblem()">删除</button><h3>全部提交筛选</h3><input id="filterProblem" placeholder="题目编号"><input id="filterUser" placeholder="用户编号"><select id="filterStatus"><option value="">全部状态</option><option>pending</option><option>running</option><option>finished</option><option>failed</option></select><select id="filterResult"><option value="">全部结果</option><option>AC</option><option>WA</option><option>RE</option><option>TLE</option><option>SE</option></select><button onclick="loadTeacherSubmissions()">查询</button><div id="teacherSubmissions"></div></section>
   <section id="adminPanel" hidden><h2>管理员</h2><input id="searchUsername" placeholder="精确用户名"><button onclick="loadUsers()">查询用户</button><button onclick="createBackup()">创建备份</button><button onclick="loadBackups()">查看备份</button><input id="restoreBackupId" placeholder="备份编号"><button onclick="restoreBackup()">恢复备份</button><div id="users"></div><div id="backupList"></div></section>
-  <pre id="message"></pre>
+  <section id="messagePanel" class="message-panel" hidden><button onclick="hideMessage()">关闭</button><h2>详细信息</h2><pre id="message"></pre></section>
   <script>
     let currentUser = null;
     const byId = id => document.getElementById(id);
-    const msg = value => byId('message').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    const msg = value => { byId('message').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); byId('messagePanel').hidden = false; };
+    const hideMessage = () => { byId('messagePanel').hidden = true; byId('message').textContent = ''; };
     function apiError(payload) { if (payload.code === 422 && Array.isArray(payload.data)) { return payload.data.map(item => `${item.loc.slice(1).join('.')}: ${item.msg}`).join('\n'); } return payload.message || '请求失败'; }
     async function api(path, options = {}) { options.credentials = 'include'; if (options.body) options.headers = {'Content-Type': 'application/json'}; const response = await fetch('/api' + path, options); const payload = await response.json(); if (!response.ok) throw new Error(apiError(payload)); return payload.data; }
-    async function auth(kind) { try { msg(await api('/auth/' + kind, {method: 'POST', body: JSON.stringify({username: byId('username').value, password: byId('password').value})})); await me(); } catch (error) { msg(error.message); } }
+    async function auth(kind) { try { await api('/auth/' + kind, {method: 'POST', body: JSON.stringify({username: byId('username').value, password: byId('password').value})}); hideMessage(); await me(); } catch (error) { msg(error.message); } }
     async function me() { try { currentUser = await api('/auth/me'); byId('who').textContent = `${currentUser.username} (${currentUser.role})`; byId('teacherPanel').hidden = !['teacher', 'admin'].includes(currentUser.role); byId('adminPanel').hidden = currentUser.role !== 'admin'; await loadProblems(); await loadSubs(); } catch { currentUser = null; byId('who').textContent = '未登录，请先登录后查看题目'; byId('problems').textContent = '登录后显示题目列表。可使用管理员账号 admin / admin12345。'; byId('subs').textContent = '登录后显示提交记录。'; byId('teacherPanel').hidden = true; byId('adminPanel').hidden = true; } }
     async function logout() { try { await api('/auth/logout', {method: 'POST'}); await me(); } catch (error) { msg(error.message); } }
     async function loadProblems() { try { const data = await api('/problems'); byId('problems').innerHTML = data.items.map(item => `<p><button onclick="openProblem('${item.id}')">查看题目</button> <b>${item.id}</b> ${item.title} [${item.difficulty}] ${item.tags.join(' / ')}</p>`).join('') || '暂无题目'; } catch (error) { msg(error.message); } }

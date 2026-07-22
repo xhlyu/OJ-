@@ -5,6 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.database import SessionLocal
+from app.models import Submission
 from app.services import transition_submission
 
 
@@ -59,5 +61,31 @@ def test_rejudge_and_full_log_audit():
 def test_rejudge_rejects_running_submission():
     with TestClient(app) as admin_client:
         login_admin(admin_client)
-        response = admin_client.post("/api/submissions/missing/rejudge")
-        assert response.status_code == 404
+        admin_id = admin_client.get("/api/auth/me").json()["data"]["id"]
+        with SessionLocal() as db:
+            running = Submission(
+                user_id=admin_id, problem_id="DEMO_A_PLUS_B", language="python",
+                source_code="print(3)", status="running",
+            )
+            db.add(running)
+            db.commit()
+            submission_id = running.id
+        response = admin_client.post(f"/api/submissions/{submission_id}/rejudge")
+        assert response.status_code == 409
+        assert response.json()["message"] == "submission is not ready for rejudge"
+
+
+def test_submission_view_contains_all_required_assignment_fields():
+    with TestClient(app) as client:
+        login_admin(client)
+        created = client.post("/api/submissions", json={
+            "problem_id": "DEMO_A_PLUS_B", "language": "python",
+            "source_code": "a, b = map(int, input().split()); print(a + b)",
+        })
+        assert created.status_code == 202
+        submission_id = created.json()["data"]["submission_id"]
+        detail = client.get(f"/api/submissions/{submission_id}").json()["data"]
+        assert {
+            "id", "user_id", "problem_id", "language", "source_code", "status", "result",
+            "score", "total_time", "created_at", "started_at", "finished_at",
+        } <= detail.keys()

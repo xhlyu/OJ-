@@ -78,6 +78,8 @@ async def update_user(user_id: str, body: UserUpdate, operator: User = Depends(a
                         detail=f"{old_role} -> {body.role}"))
     if old_active and not body.is_active:
         db.add(AuditLog(operator_id=operator.id, action="DISABLE_USER", target_type="user", target_id=user.id))
+    if not old_active and body.is_active:
+        db.add(AuditLog(operator_id=operator.id, action="ENABLE_USER", target_type="user", target_id=user.id))
     if old_role == body.role and old_active == body.is_active:
         db.add(AuditLog(operator_id=operator.id, action="UPDATE_USER", target_type="user", target_id=user.id,
                         detail="no changes"))

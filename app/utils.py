@@ -31,6 +31,16 @@ def sanitize_error(value: str) -> str:
     return truncate_text(value)
 
 
+def student_error_view(value: str) -> str:
+    value = sanitize_error(value)
+    if "Traceback (most recent call last):" not in value:
+        return value
+    lines = [line for line in value.splitlines() if line.strip()]
+    location = next((line.strip() for line in reversed(lines) if "<submission>/main.py" in line), "")
+    summary = lines[-1].strip() if lines else "runtime error"
+    return truncate_text("\n".join(part for part in (location, summary) if part))
+
+
 def normalize_output(value: str) -> str:
     value = value.replace("\r\n", "\n").replace("\r", "\n")
     lines = [line.rstrip(" \t") for line in value.split("\n")]

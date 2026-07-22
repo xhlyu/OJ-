@@ -6,7 +6,7 @@ import json
 import shutil
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -109,7 +109,8 @@ async def list_backups(_: User = Depends(admin), db: Session = Depends(get_db)):
 
 
 @router.post("/admin/backups/{backup_id}/restore")
-async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Session = Depends(get_db)):
+async def restore_backup(backup_id: str, request: Request, operator: User = Depends(admin),
+                         db: Session = Depends(get_db)):
     if not backup_id.startswith("backup_") or any(x in backup_id for x in ("/", "\\", "..")):
         write_restore_audit(operator.id, backup_id, False, "invalid backup id")
         raise HTTPException(400, "invalid backup id")
@@ -154,4 +155,5 @@ async def restore_backup(backup_id: str, operator: User = Depends(admin), db: Se
         write_restore_audit(operator.id, backup_id, False, "database replacement failed")
         raise HTTPException(500, "restore failed")
     write_restore_audit(operator.id, backup_id, True)
+    request.session.clear()
     return response({"backup_id": backup_id}, "backup restored")

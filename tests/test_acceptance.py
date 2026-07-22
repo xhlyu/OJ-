@@ -5,9 +5,24 @@ import time
 
 from fastapi.testclient import TestClient
 
-from app.database import SessionLocal
 from app.main import app
-from app.models import User
+
+
+REQUIRED_API_ROUTES = {
+    ("POST", "/api/auth/register"), ("POST", "/api/auth/login"),
+    ("POST", "/api/auth/logout"), ("GET", "/api/auth/me"),
+    ("GET", "/api/users"), ("GET", "/api/users/{user_id}"),
+    ("PUT", "/api/users/{user_id}"), ("GET", "/api/problems"),
+    ("GET", "/api/problems/{problem_id}"), ("POST", "/api/problems"),
+    ("PUT", "/api/problems/{problem_id}"), ("DELETE", "/api/problems/{problem_id}"),
+    ("POST", "/api/submissions"), ("GET", "/api/submissions"),
+    ("GET", "/api/submissions/{submission_id}"),
+    ("POST", "/api/submissions/{submission_id}/rejudge"),
+    ("GET", "/api/submissions/{submission_id}/logs"), ("GET", "/api/logs"),
+    ("GET", "/api/audit-logs"), ("POST", "/api/admin/backups"),
+    ("GET", "/api/admin/backups"),
+    ("POST", "/api/admin/backups/{backup_id}/restore"),
+}
 
 
 def test_all_fastapi_routes_are_async():
@@ -18,6 +33,29 @@ def test_all_fastapi_routes_are_async():
             if line.strip().startswith(("@router.get", "@router.post", "@router.put", "@router.delete", "@app.get")):
                 next_line = next(item.strip() for item in lines[index + 1:] if item.strip())
                 assert next_line.startswith("async def "), f"route in {path}:{index + 1} must use async def"
+
+
+def test_all_required_assignment_routes_exist():
+    actual = {
+        (method.upper(), path)
+        for path, operations in app.openapi()["paths"].items()
+        for method in operations
+        if path.startswith("/api")
+    }
+    assert REQUIRED_API_ROUTES <= actual
+
+
+def test_response_body_code_matches_http_status():
+    with TestClient(app) as client:
+        cases = [
+            client.get("/api/health"),
+            client.get("/api/auth/me"),
+            client.post("/api/auth/register", json={"username": "x", "password": "x"}),
+            client.get("/api/problems/missing"),
+        ]
+        for response in cases:
+            assert response.json()["code"] == response.status_code
+            assert {"code", "message", "data"} <= response.json().keys()
 
 
 def test_time_range_validation():
@@ -43,12 +81,43 @@ def test_submission_filters_and_pagination_shape():
 
 
 def test_database_persistence_across_app_lifespans():
-    username = f"persistent{time.time_ns() % 100000000}"
+    suffix = time.time_ns() % 100000000
+    username = f"persistent{suffix}"
+    problem_id = f"PERSIST{suffix}"
     with TestClient(app) as client:
         assert client.post("/api/auth/register", json={"username": username, "password": "password123"}).status_code == 201
+        assert client.post("/api/auth/login", json={"username": username, "password": "password123"}).status_code == 200
+        client.post("/api/auth/logout")
+        assert client.post("/api/auth/login", json={"username": "admin", "password": "admin12345"}).status_code == 200
+        problem = {
+            "id": problem_id, "title": "Persistence", "description": "persist data",
+            "input_description": "none", "output_description": "print ok",
+            "samples": [{"input": "", "output": "ok\n"}], "constraints": "",
+            "time_limit": 1, "memory_limit": 128, "difficulty": "easy", "tags": ["persistence"],
+            "test_cases": [{"case_id": "persist", "input": "", "output": "ok\n",
+                            "score": 100, "is_hidden": False}],
+        }
+        assert client.post("/api/problems", json=problem).status_code == 201
+        client.post("/api/auth/logout")
+        assert client.post("/api/auth/login", json={"username": username, "password": "password123"}).status_code == 200
+        created = client.post("/api/submissions", json={
+            "problem_id": problem_id, "language": "python", "source_code": "print('ok')"
+        })
+        submission_id = created.json()["data"]["submission_id"]
+        for _ in range(100):
+            submission = client.get(f"/api/submissions/{submission_id}").json()["data"]
+            if submission["status"] in {"finished", "failed"}:
+                break
+            time.sleep(0.02)
+        assert submission["result"] == "AC"
+        assert client.get(f"/api/submissions/{submission_id}/logs").json()["data"]["cases"]
+
     with TestClient(app) as restarted_client:
         assert restarted_client.post("/api/auth/login", json={"username": username, "password": "password123"}).status_code == 200
-    with SessionLocal() as db:
-        user = db.query(User).filter(User.username == username).one()
-        db.delete(user)
-        db.commit()
+        assert restarted_client.get(f"/api/problems/{problem_id}").status_code == 200
+        persisted = restarted_client.get(f"/api/submissions/{submission_id}")
+        assert persisted.status_code == 200
+        assert persisted.json()["data"]["result"] == "AC"
+        logs = restarted_client.get(f"/api/submissions/{submission_id}/logs")
+        assert logs.status_code == 200
+        assert logs.json()["data"]["cases"][0]["case_id"] == "persist"

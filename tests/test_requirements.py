@@ -44,6 +44,13 @@ def test_admin_user_management_and_audit_log():
         audits = admin_client.get("/api/audit-logs", params={"target_id": target["id"]}).json()["data"]
         actions = {item["action"] for item in audits["items"]}
         assert {"UPDATE_USER_ROLE", "DISABLE_USER"} <= actions
+        assert admin_client.put(
+            f"/api/users/{target['id']}", json={"role": "teacher", "is_active": True}
+        ).status_code == 200
+        enabled_audits = admin_client.get(
+            "/api/audit-logs", params={"action": "ENABLE_USER", "target_id": target["id"]}
+        ).json()["data"]["items"]
+        assert enabled_audits and enabled_audits[0]["success"] is True
 
 
 def test_admin_cannot_disable_self_and_teacher_cannot_manage_users():

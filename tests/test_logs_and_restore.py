@@ -8,7 +8,7 @@ from app.config import BACKUP_DIR, LOG_TEXT_LIMIT
 from app.main import app
 from app.models import JudgeLog
 from app.serializers import log_view
-from app.utils import sanitize_error, truncate_text
+from app.utils import sanitize_error, student_error_view, truncate_text
 
 
 def login_admin(client: TestClient) -> None:
@@ -31,6 +31,23 @@ def test_log_truncation_path_sanitization_and_hidden_view():
     teacher = log_view(log, True)
     assert teacher["input_data"] == "secret input"
     assert teacher["expected_output"] == "secret answer"
+
+
+def test_student_error_view_hides_complete_python_traceback():
+    traceback = (
+        "Traceback (most recent call last):\n"
+        "  File \"C:\\oj\\temp\\submission\\main.py\", line 2, in <module>\n"
+        "    helper()\n"
+        "  File \"C:\\oj\\temp\\submission\\main.py\", line 1, in helper\n"
+        "    1 / 0\n"
+        "ZeroDivisionError: division by zero\n"
+    )
+    student = student_error_view(traceback)
+    assert "Traceback" not in student
+    assert "helper()" not in student
+    assert "C:\\oj\\temp" not in student
+    assert "<submission>/main.py" in student
+    assert "ZeroDivisionError: division by zero" in student
 
 
 def test_corrupt_backup_does_not_damage_current_data():
@@ -66,6 +83,8 @@ def test_backup_restore_rolls_back_new_user():
         assert any(item["username"] == username for item in users_before_restore)
         restored = admin_client.post(f"/api/admin/backups/{backup_id}/restore")
         assert restored.status_code == 200
+        assert admin_client.get("/api/auth/me").status_code == 401
+        login_admin(admin_client)
         users_after_restore = admin_client.get("/api/users", params={"username": username}).json()["data"]["items"]
         assert all(item["username"] != username for item in users_after_restore)
         audits = admin_client.get("/api/audit-logs", params={"action": "RESTORE_BACKUP", "target_id": backup_id}).json()["data"]["items"]

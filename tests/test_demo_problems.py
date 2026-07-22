@@ -34,3 +34,12 @@ def test_frontend_has_structured_teacher_problem_editor():
     ):
         assert text in html
     assert 'id="problemJson"' not in html
+
+
+def test_frontend_shows_required_submission_and_session_feedback():
+    html = open("frontend/index.html", encoding="utf-8").read()
+    for text in (
+        "提交时间：", "状态：", "结果：", "得分：", "查看详情",
+        "未登录或登录状态已失效", "账号已被禁用", "formatTime",
+    ):
+        assert text in html

@@ -26,6 +26,8 @@ def apply_problem(problem: Problem, body: ProblemIn) -> None:
     problem.memory_limit = body.memory_limit
     problem.difficulty = body.difficulty
     problem.tags_json = json.dumps(body.tags, ensure_ascii=False)
+    problem.judge_mode = body.judge_mode
+    problem.checker_code = body.checker_code
     problem.test_cases = [TestCase(case_id=x.case_id, input_data=x.input, expected_output=x.output,
                                    score=x.score, is_hidden=x.is_hidden) for x in body.test_cases]
 
@@ -36,7 +38,9 @@ async def list_problems(page: int = Query(1, ge=1), page_size: int = Query(20, g
     items = db.scalars(select(Problem).order_by(Problem.id.not_like("DEMO_%"), Problem.id)
                        .offset((page - 1) * page_size).limit(page_size)).all()
     total = db.scalar(select(func.count()).select_from(Problem))
-    summaries = [{k: problem_view(x)[k] for k in ("id", "title", "difficulty", "tags", "time_limit", "memory_limit")} for x in items]
+    summaries = [{k: problem_view(x)[k] for k in (
+        "id", "title", "difficulty", "tags", "time_limit", "memory_limit", "judge_mode"
+    )} for x in items]
     return response({"items": summaries, "total": total, "page": page, "page_size": page_size})
 
 

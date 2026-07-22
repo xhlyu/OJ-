@@ -11,8 +11,9 @@ from sqlalchemy import select, text, update
 
 from app.auth import hash_password
 from app.config import (ADMIN_PASSWORD, ADMIN_USERNAME, BASE_DIR, SESSION_HTTPS_ONLY,
-                        SESSION_MAX_AGE, SESSION_SECRET, ensure_directories)
-from app.database import Base, SessionLocal, engine
+                        SESSION_MAX_AGE, SESSION_SECRET, TEACHER_PASSWORD, TEACHER_USERNAME,
+                        ensure_directories)
+from app.database import Base, SessionLocal, engine, ensure_schema_compatibility
 from app.models import Submission, User
 from app.routers import admin, auth_users, problems, submissions
 from app.seed import seed_demo_problems
@@ -22,11 +23,20 @@ from app.seed import seed_demo_problems
 async def lifespan(app: FastAPI):
     ensure_directories()
     Base.metadata.create_all(engine)
+    ensure_schema_compatibility()
     with SessionLocal() as db:
         db.execute(text("PRAGMA journal_mode=WAL"))
-        if not db.scalar(select(User).where(User.username == ADMIN_USERNAME)):
+        admin_user = db.scalar(select(User).where(User.username == ADMIN_USERNAME))
+        teacher_user = db.scalar(select(User).where(User.username == TEACHER_USERNAME))
+        if not admin_user:
             db.add(User(username=ADMIN_USERNAME, password_hash=hash_password(ADMIN_PASSWORD), role="admin"))
-            db.commit()
+        elif admin_user.role != "admin":
+            raise RuntimeError(f"configured admin username {ADMIN_USERNAME!r} is already used by another role")
+        if not teacher_user:
+            db.add(User(username=TEACHER_USERNAME, password_hash=hash_password(TEACHER_PASSWORD), role="teacher"))
+        elif teacher_user.role != "teacher":
+            raise RuntimeError(f"configured teacher username {TEACHER_USERNAME!r} is already used by another role")
+        db.commit()
         seed_demo_problems(db)
         now = datetime.now(timezone.utc)
         db.execute(update(Submission).where(Submission.status.in_(["pending", "running"])).values(

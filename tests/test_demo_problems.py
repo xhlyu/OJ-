@@ -31,6 +31,7 @@ def test_frontend_has_structured_teacher_problem_editor():
         "sampleEditors", "testCaseEditors", "增加样例", "增加测试点",
         "createProblemFromForm", "updateProblemFromForm", "deleteProblemFromForm",
         "测试点总分必须等于 100",
+        "Special Judge", "teacherJudgeMode", "teacherCheckerCode",
     ):
         assert text in html
     assert 'id="problemJson"' not in html

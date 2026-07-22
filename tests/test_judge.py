@@ -48,3 +48,34 @@ def test_judge_system_error(monkeypatch):
     result = asyncio.run(run_judge("print(3)", [case()], 1))
     assert result[0] == "SE"
     assert "runner unavailable" in result[3][0].message
+
+
+def test_special_judge_accepts_equivalent_output_and_rejects_wrong_answer():
+    checker = """def check(input_data, expected_output, actual_output):
+    expected = sorted(map(int, expected_output.split()))
+    actual = sorted(map(int, actual_output.split()))
+    return actual == expected, 'numbers must match in any order'
+"""
+    accepted = asyncio.run(run_judge("print('3 2 1')", [case("1 2 3\n")], 1, "special", checker))
+    rejected = asyncio.run(run_judge("print('1 2 4')", [case("1 2 3\n")], 1, "special", checker))
+    assert accepted[0] == "AC" and accepted[1] == 100
+    assert rejected[0] == "WA" and rejected[1] == 0
+    assert rejected[3][0].message == "numbers must match in any order"
+
+
+def test_special_judge_checker_failure_becomes_system_error():
+    checker = """def check(input_data, expected_output, actual_output):
+    raise RuntimeError('broken checker')
+"""
+    result = asyncio.run(run_judge("print(3)", [case()], 1, "special", checker))
+    assert result[0] == "SE"
+    assert "broken checker" in result[3][0].message
+
+
+def test_special_judge_checker_can_import_modules():
+    checker = """import math
+def check(input_data, expected_output, actual_output):
+    return math.isclose(float(expected_output), float(actual_output), rel_tol=1e-6)
+"""
+    result = asyncio.run(run_judge("print('3.000001')", [case("3.0\n")], 1, "special", checker))
+    assert result[0] == "AC"

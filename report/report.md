@@ -2,7 +2,7 @@
 
 ## 1. 项目概述
 
-本项目使用 Python 3.13、FastAPI、SQLite 和原生 HTML/CSS/JavaScript，实现一个小型 Online Judge。系统已完成注册登录、三角色权限、题目管理、异步 Python 评测、提交状态管理、分级评测日志、审计日志、数据持久化、备份恢复和前端交互。基础版本不执行内存限制，也未实现 Docker 强隔离和进阶模块。
+本项目使用 Python 3.13、FastAPI、SQLite 和原生 HTML/CSS/JavaScript，实现一个小型 Online Judge。系统已完成注册登录、三角色权限、题目管理、异步 Python 评测、标准判题与 Special Judge、提交状态管理、分级评测日志、审计日志、数据持久化、备份恢复和前端交互。当前不执行内存限制，也未实现 Docker 强隔离和代码相似度检测。
 
 ## 2. 系统架构
 

@@ -13,6 +13,8 @@ os.environ["OJ_TEMP_DIR"] = str(TEST_RUNTIME / "temp")
 os.environ["OJ_BACKUP_DIR"] = str(TEST_RUNTIME / "backups")
 os.environ["OJ_DATABASE_PATH"] = str(TEST_RUNTIME / "data" / "test.db")
 os.environ["OJ_SESSION_SECRET"] = "pytest-session-secret"
+os.environ["OJ_TEACHER_USERNAME"] = "teacher"
+os.environ["OJ_TEACHER_PASSWORD"] = "teacher12345"
 
 
 def pytest_sessionfinish(session, exitstatus):

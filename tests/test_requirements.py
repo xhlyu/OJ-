@@ -66,6 +66,24 @@ def test_admin_cannot_disable_self_and_teacher_cannot_manage_users():
         assert teacher_client.get("/api/users").status_code == 403
 
 
+def test_default_teacher_and_admin_accounts_are_separate():
+    with TestClient(app) as teacher_client:
+        login = teacher_client.post(
+            "/api/auth/login", json={"username": "teacher", "password": "teacher12345"}
+        )
+        assert login.status_code == 200
+        assert login.json()["data"]["role"] == "teacher"
+        assert teacher_client.get("/api/users").status_code == 403
+        assert teacher_client.get("/api/admin/backups").status_code == 403
+    with TestClient(app) as admin_client:
+        login = admin_client.post(
+            "/api/auth/login", json={"username": "admin", "password": "admin12345"}
+        )
+        assert login.status_code == 200
+        assert login.json()["data"]["role"] == "admin"
+        assert admin_client.get("/api/users").status_code == 200
+
+
 def test_problem_score_validation_and_duplicate_id():
     problem_id = unique("P")
     problem = {

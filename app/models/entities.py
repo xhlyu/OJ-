@@ -42,6 +42,8 @@ class Problem(Base):
     memory_limit: Mapped[int] = mapped_column(Integer)
     difficulty: Mapped[str] = mapped_column(String(16))
     tags_json: Mapped[str] = mapped_column(Text, default="[]")
+    judge_mode: Mapped[str] = mapped_column(String(16), default="standard")
+    checker_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
     test_cases: Mapped[list["TestCase"]] = relationship(cascade="all, delete-orphan", lazy="selectin")

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import admin
 from app.config import BACKUP_DIR, DATABASE_PATH
-from app.database import SessionLocal, engine, get_db
+from app.database import SessionLocal, engine, ensure_schema_compatibility, get_db
 from app.models import AuditLog, Backup, User
 from app.utils import iso, response, validate_time_range
 
@@ -147,6 +147,7 @@ async def restore_backup(backup_id: str, request: Request, operator: User = Depe
     try:
         remove_sqlite_sidecars(DATABASE_PATH)
         shutil.copy2(source, DATABASE_PATH)
+        ensure_schema_compatibility()
         safety.unlink(missing_ok=True)
     except Exception:
         remove_sqlite_sidecars(DATABASE_PATH)

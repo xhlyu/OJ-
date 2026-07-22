@@ -55,6 +55,54 @@ def test_student_never_receives_test_cases():
     assert "test_cases" not in student.get(f"/api/problems/{problem_id}").json()["data"]
 
 
+def test_special_judge_checker_is_only_visible_to_teacher_or_admin():
+    problem_id = f"SPJ{time.time_ns() % 10000000}"
+    payload = problem_payload(problem_id)
+    payload["judge_mode"] = "special"
+    payload["checker_code"] = "def check(input_data, expected_output, actual_output):\n    return True"
+    with TestClient(app) as admin_client:
+        login_admin(admin_client)
+        created = admin_client.post("/api/problems", json=payload)
+        assert created.status_code == 201
+        assert created.json()["data"]["checker_code"].startswith("def check")
+    student = TestClient(app)
+    username = f"spjviewer{time.time_ns() % 10000000}"
+    student.post("/api/auth/register", json={"username": username, "password": "password123"})
+    student.post("/api/auth/login", json={"username": username, "password": "password123"})
+    detail = student.get(f"/api/problems/{problem_id}").json()["data"]
+    assert detail["judge_mode"] == "special"
+    assert "checker_code" not in detail and "test_cases" not in detail
+
+
+def test_special_judge_end_to_end_submission():
+    problem_id = f"SPJRUN{time.time_ns() % 10000000}"
+    payload = problem_payload(problem_id)
+    payload["samples"] = [{"input": "", "output": "1 2 3\n"}]
+    payload["test_cases"] = [{
+        "case_id": "unordered", "input": "", "output": "1 2 3\n", "score": 100, "is_hidden": False,
+    }]
+    payload["judge_mode"] = "special"
+    payload["checker_code"] = (
+        "def check(input_data, expected_output, actual_output):\n"
+        "    return sorted(expected_output.split()) == sorted(actual_output.split()), 'wrong values'\n"
+    )
+    with TestClient(app) as client:
+        login_admin(client)
+        assert client.post("/api/problems", json=payload).status_code == 201
+        submitted = client.post("/api/submissions", json={
+            "problem_id": problem_id, "language": "python", "source_code": "print('3 1 2')",
+        })
+        assert submitted.status_code == 202
+        submission_id = submitted.json()["data"]["submission_id"]
+        for _ in range(100):
+            item = client.get(f"/api/submissions/{submission_id}").json()["data"]
+            if item["status"] in {"finished", "failed"}:
+                break
+            time.sleep(0.02)
+        assert item["status"] == "finished"
+        assert item["result"] == "AC" and item["score"] == 100
+
+
 def test_teacher_can_create_update_and_delete_problem():
     problem_id = f"TEACH{time.time_ns() % 10000000}"
     username = f"teacher{time.time_ns() % 10000000}"

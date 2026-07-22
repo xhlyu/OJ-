@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DATABASE_PATH, ensure_directories
@@ -24,6 +24,18 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 class Base(DeclarativeBase):
     pass
+
+
+def ensure_schema_compatibility() -> None:
+    """Add columns introduced after the first SQLite database was created."""
+    with engine.begin() as connection:
+        columns = {row[1] for row in connection.execute(text("PRAGMA table_info(problems)"))}
+        if "judge_mode" not in columns:
+            connection.execute(text(
+                "ALTER TABLE problems ADD COLUMN judge_mode VARCHAR(16) NOT NULL DEFAULT 'standard'"
+            ))
+        if "checker_code" not in columns:
+            connection.execute(text("ALTER TABLE problems ADD COLUMN checker_code TEXT"))
 
 
 def get_db():

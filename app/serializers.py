@@ -16,8 +16,10 @@ def problem_view(problem: Problem, full: bool = False) -> dict:
             "input_description": problem.input_description, "output_description": problem.output_description,
             "samples": json.loads(problem.samples_json), "constraints": problem.constraints,
             "time_limit": problem.time_limit, "memory_limit": problem.memory_limit,
-            "difficulty": problem.difficulty, "tags": json.loads(problem.tags_json)}
+            "difficulty": problem.difficulty, "tags": json.loads(problem.tags_json),
+            "judge_mode": problem.judge_mode}
     if full:
+        data["checker_code"] = problem.checker_code
         data["test_cases"] = [{"case_id": c.case_id, "input": c.input_data, "output": c.expected_output,
                                "score": c.score, "is_hidden": c.is_hidden} for c in problem.test_cases]
     return data

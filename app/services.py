@@ -40,7 +40,8 @@ async def evaluate_submission(submission_id: str) -> None:
         db.commit()
         try:
             result, score, total_time, cases = await run_judge(
-                submission.source_code, problem.test_cases, problem.time_limit
+                submission.source_code, problem.test_cases, problem.time_limit,
+                problem.judge_mode, problem.checker_code,
             )
             for case in cases:
                 db.add(JudgeLog(submission_id=submission.id, case_id=case.case_id, result=case.result,

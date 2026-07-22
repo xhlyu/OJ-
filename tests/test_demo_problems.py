@@ -22,3 +22,15 @@ def test_frontend_contains_readable_problem_detail_fields():
     assert 'id="messagePanel"' in html
     assert 'message-panel" hidden' in html
     assert "hideMessage(); await me()" in html
+
+
+def test_frontend_has_structured_teacher_problem_editor():
+    html = open("frontend/index.html", encoding="utf-8").read()
+    for text in (
+        "教师端：编程题目管理", "teacherProblemId", "teacherProblemTitle",
+        "sampleEditors", "testCaseEditors", "增加样例", "增加测试点",
+        "createProblemFromForm", "updateProblemFromForm", "deleteProblemFromForm",
+        "测试点总分必须等于 100",
+    ):
+        assert text in html
+    assert 'id="problemJson"' not in html

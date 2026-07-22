@@ -9,14 +9,20 @@ Python 3.10+、FastAPI、SQLite 实现的小型 Online Judge。
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -X utf8 -m fastapi dev app\main.py
+```
+
+最后一条是 FastAPI 官方开发服务器启动命令，默认启用代码热重载；`-X utf8` 用于避免中文 Windows 控制台的 GBK 编码错误。以上命令不需要执行 `Activate.ps1`，因此不受 PowerShell 脚本执行策略影响。看到服务器运行地址 `http://127.0.0.1:8000` 后即表示启动成功；保持该 PowerShell 窗口开启，按 `Ctrl+C` 可停止服务。
+
+也可以使用 Uvicorn 直接启动：
+
+```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-这些命令不需要执行 `Activate.ps1`，因此不受 PowerShell 脚本执行策略影响。看到 `Uvicorn running on http://127.0.0.1:8000` 后即表示启动成功；保持该 PowerShell 窗口开启，按 `Ctrl+C` 可停止服务。
-
 访问 `http://127.0.0.1:8000/`，API 文档位于 `/docs`。
 
-前端源码位于 `frontend/index.html`，由 FastAPI 的 `/` 路由直接提供，因此不需要单独安装或启动前端。执行上面的 Uvicorn 命令后，后端 API 和前端页面会同时可用。
+前端源码位于 `frontend/index.html`，由 FastAPI 的 `/` 路由直接提供，因此不需要单独安装或启动前端。执行上面的 FastAPI 或 Uvicorn 命令后，后端 API 和前端页面会同时可用。
 
 健康检查接口为 `GET /api/health`，用于确认 Web 服务和 SQLite 连接正常。
 

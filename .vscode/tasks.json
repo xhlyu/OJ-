@@ -21,10 +21,12 @@
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": [
+        "-X",
+        "utf8",
         "-m",
-        "uvicorn",
-        "app.main:app",
-        "--reload"
+        "fastapi",
+        "dev",
+        "app/main.py"
       ],
       "isBackground": true,
       "problemMatcher": []

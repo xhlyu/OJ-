@@ -14,19 +14,13 @@ py -3.13 -m venv .venv
 
 最后一条是 FastAPI 官方开发服务器启动命令，默认启用代码热重载；`-X utf8` 用于避免中文 Windows 控制台的 GBK 编码错误。以上命令不需要执行 `Activate.ps1`，因此不受 PowerShell 脚本执行策略影响。看到服务器运行地址 `http://127.0.0.1:8000` 后即表示启动成功；保持该 PowerShell 窗口开启，按 `Ctrl+C` 可停止服务。
 
-也可以使用 Uvicorn 直接启动：
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
-```
-
 访问 `http://127.0.0.1:8000/`，API 文档位于 `/docs`。
 
-前端源码位于 `frontend/index.html`，由 FastAPI 的 `/` 路由直接提供，因此不需要单独安装或启动前端。执行上面的 FastAPI 或 Uvicorn 命令后，后端 API 和前端页面会同时可用。
+前端源码位于 `frontend/index.html`，由 FastAPI 的 `/` 路由直接提供，因此不需要单独安装或启动前端。执行上面的 FastAPI 命令后，后端 API 和前端页面会同时可用。
 
 健康检查接口为 `GET /api/health`，用于确认 Web 服务和 SQLite 连接正常。
 
-VS Code 用户可以直接打开项目，选择 `Run Mini OJ (Uvicorn)` 调试配置，或运行默认测试任务。
+VS Code 用户可以直接打开项目，选择 `Run Mini OJ (FastAPI)` 调试配置，或运行默认测试任务。
 
 初始教师默认为 `teacher / teacher12345`，只能管理题目、提交和评测日志；初始管理员默认为 `admin / admin12345`，还可以管理用户、角色、审计日志和备份。正式使用前通过环境变量 `OJ_TEACHER_USERNAME`、`OJ_TEACHER_PASSWORD`、`OJ_ADMIN_USERNAME`、`OJ_ADMIN_PASSWORD`、`OJ_SESSION_SECRET` 修改。
 

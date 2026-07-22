@@ -2,18 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Mini OJ (Uvicorn)",
+      "name": "Run Mini OJ (FastAPI)",
       "type": "debugpy",
       "request": "launch",
-      "module": "uvicorn",
+      "module": "fastapi",
       "args": [
-        "app.main:app",
-        "--reload",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "8000"
+        "dev",
+        "app/main.py"
       ],
+      "env": {
+        "PYTHONUTF8": "1"
+      },
       "jinja": true,
       "console": "integratedTerminal"
     }
